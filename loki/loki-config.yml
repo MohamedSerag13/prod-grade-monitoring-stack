@@ -1,0 +1,121 @@
+# ----------------------------------------------------------------------------------------------
+# Loki Configuration File
+# ----------------------------------------------------------------------------------------------
+
+
+# ------------------------------------------------------------
+# Authentication settings
+auth_enabled: true  # Disable authentication for development/testing
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Server configuration
+# ------------------------------------------------------------
+server:
+  http_listen_port: 3100  # Port on which Loki will listen for HTTP requests
+
+# Ingester configuration - handles incoming log data
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory          # Use in-memory key-value store for ring membership
+      replication_factor: 1      # Number of replicas for each log stream
+    final_sleep: 0s              # Time to sleep before shutting down
+  chunk_idle_period: 3m          # How long to wait before flushing a chunk to storage
+  chunk_retain_period: 1m        # How long to keep chunks in memory after flushing
+  max_transfer_retries: 0        # Number of retries when transferring chunks between ingesters
+  wal:
+    enabled: true                # Enable Write-Ahead Log for durability
+    dir: /data/wal               # Directory for WAL files
+# ------------------------------------------------------------
+
+
+# ------------------------------------------------------------
+# Schema configuration - defines how data is stored and indexed
+# ------------------------------------------------------------
+schema_config:
+  configs:
+    - from: 2022-01-01  # Start date for this schema version
+      store: boltdb-shipper  # Storage engine for index
+      object_store: filesystem  # Object storage backend
+      schema: v11  # Schema version
+      index:
+        prefix: index_  # Prefix for index files
+        period: 24h  # How often to create new index files
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Storage configuration - defines where data is stored | DEV |
+# ------------------------------------------------------------
+# storage_config:
+#   boltdb_shipper:
+#     active_index_directory: /loki/index  # Directory for active index files
+#     cache_location: /loki/boltdb-cache  # Directory for index cache
+#     shared_store: filesystem  # Use filesystem as shared storage
+#   filesystem:
+#     directory: /loki/chunks  # Directory for log chunks
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Compactor configuration - handles log compaction and retention
+# ------------------------------------------------------------
+compactor:
+  # working_directory: /loki/data/compactor  # Directory for compaction work
+  shared_store: filesystem  # Use filesystem as shared storage
+  shared_store: s3
+  compaction_interval: 5m
+# ------------------------------------------------------------
+
+
+# ------------------------------------------------------------
+# Storage configuration - defines where data is stored | PROD |
+# ------------------------------------------------------------
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/index
+    cache_location: /loki/boltdb-cache
+    shared_store: s3
+  aws:
+    s3: s3://${AWS_S3_BUCKET_NAME}
+    region: ${AWS_REGION}
+    access_key_id: ${AWS_ACCESS_KEY_ID}
+    secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+    s3forcepathstyle: true  # Only set true if using MinIO or localstack
+
+# Optional for performance optimization:
+  index_queries_cache_config:
+    memcached:
+      host: localhost
+      service: memcached
+    default_validity: 5m
+# ------------------------------------------------------------
+
+
+
+# ------------------------------------------------------------
+# Limits configuration - defines operational limits
+# ------------------------------------------------------------
+limits_config:
+  enforce_metric_name: false  # Don't enforce metric names
+  reject_old_samples: true  # Reject samples that are too old
+  reject_old_samples_max_age: 168h  # Maximum age for samples (7 days)
+  ingestion_rate_mb: 20  # Maximum ingestion rate in MB per second
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Chunk store configuration
+# ------------------------------------------------------------
+chunk_store_config:
+  max_look_back_period: 0s  # How far back to look for chunks (0 = unlimited)
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Table manager configuration - handles data retention
+# ------------------------------------------------------------
+table_manager:
+  retention_deletes_enabled: true  # Enable automatic deletion of old data
+  retention_period: 168h  # How long to keep data (7 days)
+# ------------------------------------------------------------
+
+# ----------------------------------------------------------------------------------------------

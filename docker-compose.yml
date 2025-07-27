@@ -1,0 +1,156 @@
+# Docker Compose configuration for a complete monitoring stack
+# This setup includes Prometheus, Grafana, Loki, AlertManager, and various exporters
+# for comprehensive system and application monitoring
+
+services:
+
+# ------------------------------------------------------------
+  # Prometheus - Time series database and monitoring system
+  # Collects and stores metrics from various sources
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "${PROMETHEUS_PORT}:9090"  # Web UI and API endpoint
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml  # Main configuration
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml  # Alerting rules
+      - prometheus_data:/prometheus  # Persistent storage for metrics data
+    environment:
+      - PROMETHEUS_RETENTION_DAYS=${PROMETHEUS_RETENTION_DAYS}
+    deploy:
+      resources:
+        limits:
+          memory: ${PROMETHEUS_MEMORY_LIMIT}
+    restart: unless-stopped
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # Grafana - Data visualization and analytics platform
+  # Provides dashboards and graphs for monitoring data
+  # ------------------------------------------------------------
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "${GRAFANA_PORT}:3000"  # Web interface
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=http://localhost:${GRAFANA_PORT}
+    volumes:
+      - grafana_data:/var/lib/grafana  # Persistent storage for dashboards and settings
+    deploy:
+      resources:
+        limits:
+          memory: ${GRAFANA_MEMORY_LIMIT}
+    restart: unless-stopped
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # Loki - Log aggregation system
+  # Collects and stores logs from various sources
+  loki:
+    image: grafana/loki:2.9.4
+    user: "0"  # Run as root for file system access
+    container_name: loki
+    ports:
+      - "${LOKI_PORT}:3100"  # API endpoint
+    environment:
+      - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml  # Loki configuration
+      - loki_data:/loki  # Persistent storage for logs
+    command: -config.file=/etc/loki/local-config.yaml
+    deploy:
+      resources:
+        limits:
+          memory: ${LOKI_MEMORY_LIMIT}
+    restart: unless-stopped
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # AlertManager - Handles alerts from Prometheus
+  # Manages alert routing, grouping, and notification
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT}:9093"  # Web UI and API endpoint
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - SLACK_CHANNEL=${SLACK_CHANNEL}
+    volumes:
+      - ./alertmanager/config.yml:/etc/alertmanager/alertmanager.yml  # Alert routing configuration
+    deploy:
+      resources:
+        limits:
+          memory: ${ALERTMANAGER_MEMORY_LIMIT}
+    restart: unless-stopped
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # cAdvisor - Container Advisor
+  # Monitors resource usage and performance characteristics of running containers
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "${CADVISOR_PORT}:8080"  # Metrics endpoint
+    volumes:
+      - /:/rootfs:ro  # Read-only access to host filesystem
+      - /var/run:/var/run:ro  # Read-only access to runtime data
+      - /sys:/sys:ro  # Read-only access to system information
+      - /var/lib/docker/:/var/lib/docker:ro  # Read-only access to Docker data
+    deploy:
+      resources:
+        limits:
+          memory: ${CADVISOR_MEMORY_LIMIT}
+    restart: unless-stopped
+    command:
+      - "--prometheus_endpoint=/metrics"  # Expose metrics in Prometheus format
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+
+  # Node Exporter - Host metrics exporter
+  # Collects hardware and OS metrics from the host system
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    ports:
+      - "${NODE_EXPORTER_PORT}:9100"  # Metrics endpoint
+    deploy:
+      resources:
+        limits:
+          memory: ${NODE_EXPORTER_MEMORY_LIMIT}
+    restart: unless-stopped
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # Blackbox Exporter - Probes endpoints over HTTP, HTTPS, DNS, TCP, ICMP and gRPC
+  # Used for monitoring external services and endpoints
+  blackbox-exporter:
+    image: prom/blackbox-exporter
+    container_name: blackbox
+    ports:
+      - "${BLACKBOX_PORT}:9115"  # Metrics endpoint
+    volumes:
+      - ./blackbox/config.yml:/etc/blackbox_exporter/config.yml  # Probe configuration
+    deploy:
+      resources:
+        limits:
+          memory: ${BLACKBOX_MEMORY_LIMIT}
+    restart: unless-stopped
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Named volumes for persistent data storage
+volumes:
+  grafana_data:    # Stores Grafana dashboards, users, and settings
+  loki_data:       # Stores Loki log data
+  prometheus_data: # Stores Prometheus time series data
+# ------------------------------------------------------------

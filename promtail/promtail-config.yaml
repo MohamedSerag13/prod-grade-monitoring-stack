@@ -1,0 +1,76 @@
+# Promtail Configuration File
+# This file configures Promtail to scrape logs and send them to Loki
+#-------------------------------------------------------------------
+# ------------------------------------------------------------
+# ------------------------------------------------------------
+# Server configuration for Promtail's HTTP and gRPC endpoints
+# ------------------------------------------------------------
+server:
+  http_listen_port: 9080  # Port for HTTP server (used for health checks and metrics)
+  grpc_listen_port: 0     # Disable gRPC server (0 = disabled)
+  log_level: info         # Logging level for Promtail itself
+  log_format: logfmt      # Format for Promtail's own logs
+# ------------------------------------------------------------
+# ------------------------------------------------------------
+# Position tracking - keeps track of where Promtail left off reading files
+# ------------------------------------------------------------
+positions:
+  filename: /tmp/positions/positions.yaml  # File to store read positions
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Limits configuration for log processing
+# ------------------------------------------------------------
+limits_config:
+  max_line_size: 256000  # Maximum size of a single log line in bytes
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Loki clients configuration - where to send the scraped logs
+clients:
+  - url: http://localhost:3100/loki/api/v1/push  # Loki server endpoint
+    batchsize: 102400    # Number of log lines to batch before sending
+    batchwait: 2s        # Maximum time to wait before sending a batch
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Log scraping configurations - defines what logs to collect and how to label them
+# ------------------------------------------------------------
+scrape_configs:
+  # Job 1: System logs from the host
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system           # Identifies this as system logs
+          env: production       # Environment label
+          instance: server-01   # Server instance identifier
+          __path__: /host/var/log/*.log  # Path pattern for log files to scrape
+# ------------------------------------------------------------
+
+  # Job 2: API_1 application logs
+  - job_name: API_1
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: API_1                    # Job identifier
+          app: API_1                    # Application name
+          env: production               # Environment label
+          instance: server-01           # Server instance identifier
+          __path__: /host/API_1-logs/*.txt  # Path pattern for API_1 log files
+
+  # Job 3: Backend API logs
+  - job_name: backend-api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: backend                   # Job identifier
+          app: service_catalogue_backend # Application name
+          env: production                # Environment label
+          instance: server-01            # Server instance identifier
+          __path__: /host/API_2-logs/*.txt  # Path pattern for backend log files
+# ------------------------------------------------------------
+

@@ -1,0 +1,90 @@
+# Prometheus Configuration File
+# This file defines how Prometheus scrapes metrics from various targets
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Global configuration settings that apply to all scrape jobs
+# ------------------------------------------------------------
+global:
+  scrape_interval: ${SCRAPE_INTERVAL}  # How frequently to scrape targets
+  evaluation_interval: ${EVALUATION_INTERVAL}  # How frequently to evaluate rules
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Files containing alerting rules
+# ------------------------------------------------------------
+rule_files:
+  - alert.rules.yml  # Path to alert rules file
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Alertmanager configuration - where to send alerts
+# ------------------------------------------------------------
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']  # Alertmanager service endpoint
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Scrape configurations - defines what targets to scrape and how
+# ------------------------------------------------------------
+scrape_configs:
+  # Scrape Prometheus itself for self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']  # Prometheus metrics endpoint
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # Scrape Node Exporter for host system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'  # Host server node-exporter
+          - '${REMOTE_SERVER_1_IP}:9100'  # Second host server node-exporter
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # Scrape cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets:
+          - 'cadvisor:8080'       # cAdvisor service endpoint
+          - '${REMOTE_SERVER_1_IP}:8088'  # Second host cAdvisor endpoint
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # Scrape Jenkins for CI/CD metrics
+  - job_name: 'jenkins'
+    metrics_path: /prometheus  # Jenkins Prometheus plugin endpoint
+    basic_auth:  # Authentication credentials for Jenkins
+      username: ${JENKINS_USER}
+      password: ${JENKINS_PASSWORD}
+    static_configs:
+      - targets: ['${JENKINS_URL}']  # Jenkins service endpoint
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+  # Blackbox exporter for external URL monitoring
+  - job_name: 'blackbox'
+    metrics_path: /probe  # Blackbox exporter probe endpoint
+    params:
+      module: [http_2xx]  # Use HTTP 2xx response module for health checks
+    static_configs:
+      - targets:
+          - ${TARGET_URL_1}   # First external URL to monitor
+          - ${TARGET_URL_2}   # Second external URL to monitor
+          - ${TARGET_URL_3}   # Third external URL to monitor
+      
+    # Relabeling rules to transform target URLs for blackbox exporter
+    relabel_configs:
+      # Copy the target URL to __param_target parameter
+      - source_labels: [__address__]
+        target_label: __param_target
+      # Copy the target URL to instance label for identification
+      - source_labels: [__param_target]
+        target_label: instance
+      # Replace the target address with blackbox exporter address
+      - target_label: __address__
+        replacement: blackbox:9115  # Blackbox exporter service endpoint
