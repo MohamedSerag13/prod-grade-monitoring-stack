@@ -328,6 +328,3 @@ PROMETHEUS_RETENTION_DAYS=30
 - [cAdvisor](https://github.com/google/cadvisor)
 
 ---
-
-## 📝 License
-MIT
